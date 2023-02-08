@@ -1,0 +1,3 @@
+[submodule "packages/eec"]
+	path = packages/eec
+	url = git@github.com:AlfaSquaD/EfficientEntityClusteringPackage.git
