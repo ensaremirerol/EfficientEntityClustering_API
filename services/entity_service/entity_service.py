@@ -22,7 +22,7 @@ def _entity_to_entityOut(entity: BaseEntity) -> EntityOut:
         mention=entity.mention,
         entity_source=entity.entity_source,
         entity_source_id=entity.entity_source_id,
-        has_cluster=entity.in_cluster,
+        in_cluster=entity.in_cluster,
         cluster_id=entity.cluster_id if entity.in_cluster else '',
         has_mention_vector=entity.has_mention_vector
     )
@@ -105,14 +105,28 @@ async def create_entities(payload: List[EntityIn]):
     ]
 
 
-@entities_router.post("/update-entity", status_code=200)
+@entities_router.post("/update-entity", response_model=EntityOut, status_code=200)
 async def update_entity(payload: EntityIn):
     entity_repo = EntityClustererBridge().entity_repository
     entity: BaseEntity = _entityIn_to_entity(payload)
     try:
-        entity = entity_repo.update_entity(entity)
+        org_entity = entity_repo.delete_entity(entity.entity_id)
     except NotFoundException as e:
         raise HTTPException(status_code=404, detail=e.message)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+    if org_entity.in_cluster:
+        cluster_repo = EntityClustererBridge().cluster_repository
+        cluster_repo.remove_entity_from_cluster(org_entity.cluster_id, org_entity.entity_id)
+
+    try:
+        org_entity.entity_id = entity.entity_id
+        org_entity.mention = entity.mention
+        org_entity.entity_source = entity.entity_source
+        org_entity.entity_source_id = entity.entity_source_id
+        entity_repo.add_entity(org_entity)
+        return _entity_to_entityOut(org_entity)
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 

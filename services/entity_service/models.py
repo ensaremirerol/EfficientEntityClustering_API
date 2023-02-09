@@ -13,6 +13,6 @@ class EntityOut(BaseModel):
     mention: str
     entity_source: str
     entity_source_id: str
-    has_cluster: bool
+    in_cluster: bool
     cluster_id: str
     has_mention_vector: bool
