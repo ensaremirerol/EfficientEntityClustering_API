@@ -38,7 +38,7 @@ async def get_all_entities():
     ]
 
 
-@entities_router.get("/{entity_id}", response_model=EntityOut)
+@entities_router.get("/entity/{entity_id}", response_model=EntityOut)
 async def get_entity_by_id(entity_id: str):
     entity_repo = EntityClustererBridge().entity_repository
     try:
@@ -50,7 +50,7 @@ async def get_entity_by_id(entity_id: str):
     return _entity_to_entityOut(entity)
 
 
-@entities_router.get("/source/{entity_source}/{entity_source_id}", response_model=EntityOut)
+@entities_router.get("/entity/source/{entity_source}/{entity_source_id}", response_model=EntityOut)
 async def get_entity_by_source_id(entity_source: str, entity_source_id: str):
     entity_repo = EntityClustererBridge().entity_repository
     try:
@@ -62,7 +62,7 @@ async def get_entity_by_source_id(entity_source: str, entity_source_id: str):
     return _entity_to_entityOut(entity)
 
 
-@entities_router.get("/source/{entity_source}", response_model=List[EntityOut])
+@entities_router.get("/entity/source/{entity_source}", response_model=List[EntityOut])
 async def get_entities_by_source(entity_source: str):
     entity_repo = EntityClustererBridge().entity_repository
     try:
@@ -73,6 +73,18 @@ async def get_entities_by_source(entity_source: str):
         _entity_to_entityOut(entity)
         for entity in entities
     ]
+
+
+@entities_router.get("/next-entity", response_model=EntityOut)
+async def get_next_entity():
+    entity_repo = EntityClustererBridge().entity_repository
+    try:
+        entity: BaseEntity = entity_repo.get_random_unlabeled_entity()
+    except NotFoundException as e:
+        raise HTTPException(status_code=404, detail=e.message)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+    return _entity_to_entityOut(entity)
 
 
 @entities_router.post("/create-entity", response_model=EntityOut, status_code=201)
