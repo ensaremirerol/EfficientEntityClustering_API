@@ -7,11 +7,14 @@ import os
 
 from services.entity_service.entity_service import entities_router
 from services.cluster_service.cluster_service import cluster_router
+from services.mention_clustering_service.mention_clustering import mention_clustering_router
 
 app = FastAPI()
 
 app.include_router(entities_router, prefix="/entities", tags=["entities"])
 app.include_router(cluster_router, prefix="/clusters", tags=["clusters"])
+app.include_router(mention_clustering_router, prefix="/mention_clustering",
+                   tags=["mention_clustering"])
 
 
 @app.get("/")
