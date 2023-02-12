@@ -39,6 +39,7 @@ docker run -p 8000:8000 \
 ### 🏃 Run
 
 ```bash
+source .venv/bin/activate
 python3 main.py
 ```
 
