@@ -17,6 +17,6 @@ RUN pip install ./packages/eec/src
 
 # Entry point for FastAPI
 
-ENTRYPOINT ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000" ]
+ENTRYPOINT ["python", "main.py"]
 
 EXPOSE 8000
