@@ -10,9 +10,7 @@ import uvicorn
 import logging
 from logging.handlers import RotatingFileHandler
 import sys
-
-
-# TODO: DUplicate logging
+from utils.SIGINT_handler import SIGINTHandler
 
 LOGGER_PATH = Path(os.getenv("LOGGER_PATH") or "./")
 
@@ -26,8 +24,8 @@ if not (LOGGER_PATH / "main.log").exists():
 
 logging.basicConfig(
     level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-    handlers=[logging.FileHandler(LOGGER_PATH / "main.log"),
-              RotatingFileHandler(LOGGER_PATH / "main.log", maxBytes=1000000, backupCount=5)])
+    handlers=[
+        RotatingFileHandler(LOGGER_PATH / "main.log", maxBytes=1000000, backupCount=5)])
 
 
 def exception_handler(request, exc):
@@ -157,28 +155,42 @@ def load_data():
 
 
 def save_data():
-    logging.info("Saving data...")
-    data_path = check_files()
+    with SIGINTHandler():
+        logging.info("Saving data...")
+        data_path = check_files()
 
-    # Save entities
-    entities_path = data_path / "entities.json"
-    with open(entities_path, "w") as f:
-        json.dump(EntityClustererBridge().entity_repository.to_dict(), f)
-    logging.info("Entities saved")
+        # Save entities
+        entities_path = data_path / "entities.json.new"
+        with open(entities_path, "w") as f:
+            json.dump(EntityClustererBridge().entity_repository.to_dict(), f)
 
-    # Save clusters
-    clusters_path = data_path / "clusters.json"
-    with open(clusters_path, "w") as f:
-        json.dump(EntityClustererBridge().cluster_repository.to_dict(), f)
-    logging.info("Clusters saved")
+        os.remove(data_path / "entities.json")
+        os.rename(entities_path, data_path / "entities.json")
+
+        logging.info("Entities saved")
+
+        # Save clusters
+        clusters_path = data_path / "clusters.json.new"
+        with open(clusters_path, "w") as f:
+            json.dump(EntityClustererBridge().cluster_repository.to_dict(), f)
+
+        os.remove(data_path / "clusters.json")
+        os.rename(clusters_path, data_path / "clusters.json")
+        logging.info("Clusters saved")
 
 # endregion
 
 
 if __name__ == "__main__":
-    logging.getLogger("uvicorn").setLevel(logging.INFO)
-    logging.getLogger("fastapi").setLevel(logging.INFO)
+    debug = __debug__
+    logging_level = logging.INFO if not debug else logging.DEBUG
+    reload_flag = True if debug else False
+    logging.getLogger("uvicorn").setLevel(logging_level)
+    logging.getLogger("fastapi").setLevel(logging_level)
     handler = logging.StreamHandler(sys.stdout)
     logging.getLogger("uvicorn").addHandler(handler)
-    uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True, log_level="info",
-                log_config=logging.basicConfig(level=logging.INFO, filename=LOGGER_PATH / "main.log",))
+
+    uvicorn.run(
+        "main:app", host="0.0.0.0", port=8000, reload=reload_flag, log_level=logging_level,
+        log_config=logging.basicConfig(
+            level=logging.INFO, filename=LOGGER_PATH / "main.log",))
