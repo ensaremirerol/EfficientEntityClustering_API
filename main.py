@@ -1,13 +1,37 @@
+from services.mention_clustering_service.mention_clustering import mention_clustering_router
+from services.cluster_service.cluster_service import cluster_router
+from services.entity_service.entity_service import entities_router
 from fastapi import FastAPI
 from pathlib import Path
 from eec import EntityClustererBridge
 import json
 import os
+import uvicorn
+import logging
+from logging.handlers import RotatingFileHandler
+import sys
+
+LOGGER_PATH = Path(os.getenv("LOGGER_PATH") or "./")
+
+if not LOGGER_PATH.exists():
+    LOGGER_PATH.mkdir()
+
+if not (LOGGER_PATH / "main.log").exists():
+    with open(LOGGER_PATH / "main.log", "w") as f:
+        f.write("")
+        f.close()
+
+logging.basicConfig(
+    level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+    handlers=[logging.FileHandler(LOGGER_PATH / "main.log"),
+              RotatingFileHandler(LOGGER_PATH / "main.log", maxBytes=1000000, backupCount=5)])
 
 
-from services.entity_service.entity_service import entities_router
-from services.cluster_service.cluster_service import cluster_router
-from services.mention_clustering_service.mention_clustering import mention_clustering_router
+def exception_handler(request, exc):
+    logging.exception("Uncatched exception!\n{}".format(exc))
+
+
+sys.excepthook = exception_handler
 
 app = FastAPI()
 
@@ -24,21 +48,22 @@ async def root():
 
 @app.on_event("startup")
 async def startup_event():
-    print("Starting up...")
     load_data()
-    print("Data loaded")
+    logging.info("Data loaded")
 
 
 @ app.on_event("shutdown")
 async def shutdown_event():
-    print("Shutting down...")
+    logging.info("Shutting down...")
+    logging.info("Saving data...")
     save_data()
-    print("Data saved")
+    logging.info("Data saved")
+    logging.info(10 * "-" + "Shutdown complete" + 10 * "-")
 
 
 # region Load data
 def check_files():
-    print("Checking files...")
+    logging.info("Checking files...")
     _env_data = os.getenv("DATA_PATH") or "data"
     data_path = Path(_env_data)
 
@@ -49,17 +74,17 @@ def check_files():
 
 
 def load_data():
-    print("Loading data...")
+    logging.info("Loading data...")
     data_path = check_files()
 
     # Load config
     config_path = data_path / "config.json"
     if not config_path.exists():
-        print("Config file not found")
+        logging.error("Config file not found")
         exit(1)
     with open(config_path, "r") as f:
         config = json.load(f)
-    print("Config loaded")
+    logging.info("Config loaded")
 
     if config['type'] == 'base':
         from eec import BaseEntityRepository, BaseClusterRepository
@@ -68,16 +93,16 @@ def load_data():
         # Load Word2Vec model
         model_path = data_path / config['word2vec_file']
         if not model_path.exists():
-            print("Model file not found")
+            logging.error("Model file not found")
             exit(1)
         model = KeyedVectors.load(str(model_path))
-        print("Model loaded")
+        logging.info("Model loaded")
         # Load entities
         entities_path = data_path / "entities.json"
         entity_repo = None
         if not entities_path.exists():
-            print("Entities file not found")
-            print("Creating empty entities object")
+            logging.info("Entities file not found")
+            logging.info("Creating empty entities object")
             entity_repo = BaseEntityRepository(
                 entities=[],
                 last_id=0,
@@ -95,8 +120,8 @@ def load_data():
         clusters_path = data_path / "clusters.json"
         cluster_repo = None
         if not clusters_path.exists():
-            print("Clusters file not found")
-            print("Creating empty clusters object")
+            logging.info("Clusters file not found")
+            logging.info("Creating empty clusters object")
             cluster_repo = BaseClusterRepository(
                 clusters=[],
                 entity_repository=entity_repo,
@@ -129,24 +154,28 @@ def load_data():
 
 
 def save_data():
-    print("Saving data...")
+    logging.info("Saving data...")
     data_path = check_files()
 
     # Save entities
     entities_path = data_path / "entities.json"
     with open(entities_path, "w") as f:
         json.dump(EntityClustererBridge().entity_repository.to_dict(), f)
-    print("Entities saved")
+    logging.info("Entities saved")
 
     # Save clusters
     clusters_path = data_path / "clusters.json"
     with open(clusters_path, "w") as f:
         json.dump(EntityClustererBridge().cluster_repository.to_dict(), f)
-    print("Clusters saved")
+    logging.info("Clusters saved")
 
 # endregion
 
 
 if __name__ == "__main__":
-    import uvicorn
-    uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True, log_level="info")
+    logging.getLogger("uvicorn").setLevel(logging.INFO)
+    logging.getLogger("fastapi").setLevel(logging.INFO)
+    handler = logging.StreamHandler(sys.stdout)
+    logging.getLogger("uvicorn").addHandler(handler)
+    uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True, log_level="info",
+                log_config=logging.basicConfig(level=logging.INFO, filename=LOGGER_PATH / "main.log",))
