@@ -1,0 +1,7 @@
+{
+    "type": "base",
+    "word2vec_file": "word2vec.model",
+    "method_config": {
+        "method": "base"
+    }
+}

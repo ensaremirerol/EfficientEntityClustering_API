@@ -10,6 +10,18 @@ This API designed to be work with Efficient Entity Clustering Application. It is
 
 ## 🚀 Getting Started
 
+## 📝 Environment Variables
+
+-   `DATA_PATH` - Path to the directory where the data will be stored. Default value is `./data`.
+
+-   `LOGGER_PATH` - Path to the directory where the logs will be stored. Default value is `./` (current directory).
+
+## 📝 Configuration
+
+You have to create a data folder for API to use. And data folder must contain a `config.json` file. You can find an [example configuration](example_config.json) file in the repository.
+
+Also, data folder should contain Word2Vec model file. You specify the name of the file in the configuration file.
+
 ## 🐳 Docker
 
 ### 📦 Build
@@ -42,9 +54,3 @@ docker run -p 8000:8000 \
 source .venv/bin/activate
 python3 main.py
 ```
-
-## 📝 Environment Variables
-
--   `DATA_PATH` - Path to the directory where the data will be stored.
-
--   `LOGGER_PATH` - Path to the directory where the logs will be stored.
