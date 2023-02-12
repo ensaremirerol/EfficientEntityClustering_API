@@ -11,6 +11,9 @@ import logging
 from logging.handlers import RotatingFileHandler
 import sys
 
+
+# TODO: DUplicate logging
+
 LOGGER_PATH = Path(os.getenv("LOGGER_PATH") or "./")
 
 if not LOGGER_PATH.exists():
