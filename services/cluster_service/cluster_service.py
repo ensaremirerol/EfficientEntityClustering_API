@@ -26,7 +26,7 @@ async def get_all_clusters():
     ]
 
 
-@cluster_router.get("/{cluster_id}", response_model=ClusterOut)
+@cluster_router.get("/cluster/{cluster_id}", response_model=ClusterOut)
 async def get_cluster_by_id(cluster_id: str):
     cluster_repo = EntityClustererBridge().cluster_repository
     try:
@@ -38,7 +38,7 @@ async def get_cluster_by_id(cluster_id: str):
     return _base_cluster_to_clusterOut(cluster)
 
 
-@cluster_router.post("/", response_model=ClusterOut)
+@cluster_router.post("/cluster/create", response_model=ClusterOut)
 async def create_cluster(cluster_in: ClusterIn):
     cluster_repo = EntityClustererBridge().cluster_repository
     cluster = BaseCluster(
@@ -58,7 +58,7 @@ async def create_cluster(cluster_in: ClusterIn):
     return _base_cluster_to_clusterOut(cluster)
 
 
-@cluster_router.delete("/{cluster_id}")
+@cluster_router.delete("/cluster/{cluster_id}")
 async def delete_cluster(cluster_id: str):
     cluster_repo = EntityClustererBridge().cluster_repository
     try:
@@ -80,7 +80,7 @@ async def delete_all_clusters():
     return
 
 
-@cluster_router.post("/{cluster_id}/add-entity", response_model=ClusterOut)
+@cluster_router.post("/cluster/{cluster_id}/add-entity", response_model=ClusterOut)
 async def add_entity_to_cluster(cluster_id: str, entity_id: str):
     cluster_repo = EntityClustererBridge().cluster_repository
     try:
@@ -95,7 +95,7 @@ async def add_entity_to_cluster(cluster_id: str, entity_id: str):
     return _base_cluster_to_clusterOut(cluster)
 
 
-@cluster_router.post("/{cluster_id}/add-entities", response_model=ClusterOut)
+@cluster_router.post("/cluster/{cluster_id}/add-entities", response_model=ClusterOut)
 async def add_entities_to_cluster(cluster_id: str, payload: ClusterAddEntityIn):
     cluster_repo = EntityClustererBridge().cluster_repository
     try:
