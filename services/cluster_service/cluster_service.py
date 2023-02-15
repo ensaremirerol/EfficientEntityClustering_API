@@ -1,6 +1,8 @@
 from typing import List
 from fastapi import APIRouter, HTTPException, Header
+from fastapi.responses import FileResponse
 from .models import *
+import pandas as pd
 
 from eec import EntityClustererBridge, BaseCluster, BaseEntity, NotFoundException, AlreadyExistsException, AlreadyInClusterException
 
@@ -24,6 +26,27 @@ async def get_all_clusters():
         _base_cluster_to_clusterOut(cluster)
         for cluster in _all_clusters
     ]
+
+
+@cluster_router.get("/export/csv", response_class=FileResponse)
+async def export_clusters_csv():
+    cluster_repo = EntityClustererBridge().cluster_repository
+    _all_clusters: list[BaseCluster] = cluster_repo.get_all_clusters()
+    pd.DataFrame([
+        {
+            'cluster_id': cluster.cluster_id,
+            'cluster_name': cluster.cluster_name,
+            'entity_ids': [entity.entity_id for entity in cluster.entities],
+            'cluster_vector': cluster.cluster_vector.tolist()
+        }
+        for cluster in _all_clusters
+    ]).to_csv(
+        './tmp/clusters.csv',
+        index=False
+    )
+    return FileResponse('./tmp/clusters.csv',
+                        filename='clusters.csv',
+                        media_type='text/csv')
 
 
 @cluster_router.get("/cluster/{cluster_id}", response_model=ClusterOut)

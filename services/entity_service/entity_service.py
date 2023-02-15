@@ -1,6 +1,8 @@
 from typing import List
 from fastapi import APIRouter, HTTPException, Header
+from fastapi.responses import FileResponse
 from .models import *
+import pandas as pd
 
 from eec import EntityClustererBridge, BaseEntityRepository, BaseEntity, NotFoundException, AlreadyExistsException
 
@@ -36,6 +38,33 @@ async def get_all_entities():
         _entity_to_entityOut(entity)
         for entity in _all_entites
     ]
+
+
+@entities_router.get("/export/csv", response_class=FileResponse)
+async def export_entities_csv():
+    entity_repo = EntityClustererBridge().entity_repository
+    _all_entites: list[BaseEntity] = entity_repo.get_all_entities()
+    pd.DataFrame([
+        {
+            'entity_id': entity.entity_id,
+            'mention': entity.mention,
+            'entity_source': entity.entity_source,
+            'entity_source_id': entity.entity_source_id,
+            'in_cluster': entity.in_cluster,
+            'cluster_id': entity.cluster_id if entity.in_cluster else '',
+            'has_mention_vector': entity.has_mention_vector,
+            'mention_vector': entity.mention_vector if entity.has_mention_vector else ''
+        }
+        for entity in _all_entites
+    ]).to_csv(
+        './tmp/entities.csv',
+    )
+
+    return FileResponse(
+        path="./tmp/entities.csv",
+        filename="entities.csv",
+        media_type="text/csv"
+    )
 
 
 @entities_router.get("/entity/{entity_id}", response_model=EntityOut)
