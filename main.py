@@ -1,7 +1,8 @@
 from services.mention_clustering_service.mention_clustering import mention_clustering_router
 from services.cluster_service.cluster_service import cluster_router
 from services.entity_service.entity_service import entities_router
-from fastapi import FastAPI
+from fastapi import FastAPI, WebSocket, WebSocketDisconnect
+import asyncio
 from pathlib import Path
 from eec import EntityClustererBridge
 import json
@@ -45,6 +46,27 @@ app.include_router(mention_clustering_router, prefix="/mention_clustering",
 @app.get("/")
 async def root():
     return {"message": "Hello World"}
+
+
+async def log_reader(n=100):
+    log_lines = []
+    with open(LOGGER_PATH / 'main.log', "r") as file:
+        log_lines = file.readlines()[-n:]
+        return log_lines
+
+
+@app.websocket("/ws")
+async def websocket_endpoint(websocket: WebSocket):
+    await websocket.accept()
+    try:
+        while True:
+            await asyncio.sleep(1)
+            log_lines = await log_reader()
+            await websocket.send_text("\n".join(log_lines))
+    except WebSocketDisconnect:
+        logging.info("Websocket disconnected")
+    finally:
+        await websocket.close()
 
 
 @app.on_event("startup")
@@ -183,7 +205,7 @@ def save_data():
 
 if __name__ == "__main__":
     debug = __debug__
-    logging_level = logging.INFO if not debug else logging.DEBUG
+    logging_level = logging.INFO if not os.environ.get("DEBUG") else logging.DEBUG
     reload_flag = True if debug else False
     logging.getLogger("uvicorn").setLevel(logging_level)
     logging.getLogger("fastapi").setLevel(logging_level)
