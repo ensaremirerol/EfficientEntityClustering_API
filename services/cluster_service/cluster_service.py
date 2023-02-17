@@ -118,6 +118,19 @@ async def add_entity_to_cluster(cluster_id: str, entity_id: str):
     return _base_cluster_to_clusterOut(cluster)
 
 
+@cluster_router.post("/cluster/{cluster_id}/remove-entity", response_model=ClusterOut)
+async def remove_entity_to_cluster(cluster_id: str, entity_id: str):
+    cluster_repo = EntityClustererBridge().cluster_repository
+    try:
+        cluster_repo.remove_entity_from_cluster(cluster_id=cluster_id, entity_id=entity_id)
+    except NotFoundException as e:
+        raise HTTPException(status_code=404, detail=e.message)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+    cluster = cluster_repo.get_cluster_by_id(cluster_id)
+    return _base_cluster_to_clusterOut(cluster)
+
+
 @cluster_router.post("/cluster/{cluster_id}/add-entities", response_model=ClusterOut)
 async def add_entities_to_cluster(cluster_id: str, payload: ClusterAddEntityIn):
     cluster_repo = EntityClustererBridge().cluster_repository
