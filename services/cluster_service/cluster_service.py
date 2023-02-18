@@ -119,7 +119,7 @@ async def add_entity_to_cluster(cluster_id: str, entity_id: str):
 
 
 @cluster_router.post("/cluster/{cluster_id}/remove-entity", response_model=ClusterOut)
-async def remove_entity_to_cluster(cluster_id: str, entity_id: str):
+async def remove_entity_from_cluster(cluster_id: str, entity_id: str):
     cluster_repo = EntityClustererBridge().cluster_repository
     try:
         cluster_repo.remove_entity_from_cluster(cluster_id=cluster_id, entity_id=entity_id)
