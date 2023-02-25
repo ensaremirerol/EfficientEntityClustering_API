@@ -93,6 +93,16 @@ async def delete_cluster(cluster_id: str):
     return
 
 
+@cluster_router.delete("/cluster/delete", status_code=200)
+async def delete_clusters(clusters_in: DeleteClustersIn):
+    cluster_repo = EntityClustererBridge().cluster_repository
+    try:
+        cluster_repo.delete_clusters(clusters_in.cluster_ids)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+    return
+
+
 @cluster_router.delete("/")
 async def delete_all_clusters():
     cluster_repo = EntityClustererBridge().cluster_repository

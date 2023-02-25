@@ -15,3 +15,7 @@ class ClusterOut(BaseModel):
     cluster_name: str
     entity_ids: list[str]
     cluster_vector: list[float]
+
+
+class DeleteClustersIn(BaseModel):
+    cluster_ids: list[str]

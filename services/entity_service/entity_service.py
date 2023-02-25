@@ -189,3 +189,12 @@ async def delete_entity(entity_id: str):
         entity_repo.delete_entity(entity_id)
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+
+@entities_router.delete("/delete-entities", status_code=200)
+async def delete_entities(payload: DeleteEntitiesIn):
+    entity_repo = EntityClustererBridge().entity_repository
+    try:
+        entity_repo.delete_entities(payload.entity_ids)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))

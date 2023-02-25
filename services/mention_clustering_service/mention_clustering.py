@@ -1,4 +1,3 @@
-from typing import List
 from fastapi import APIRouter, HTTPException, Header
 from .models import *
 
@@ -11,9 +10,17 @@ mention_clustering_router = APIRouter()
 async def get_prediction_for_next_mention():
     entity_repo = EntityClustererBridge().entity_repository
     method = EntityClustererBridge().mention_clustering_method
-    entity: BaseEntity = entity_repo.get_random_unlabeled_entity()
+    try:
+        entity: BaseEntity = entity_repo.get_random_unlabeled_entity()
+    except NotFoundException:
+        raise HTTPException(status_code=404, detail="No unlabeled entities found")
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
-    possible_clusters = method.getPossibleClusters(entity)
+    try:
+        possible_clusters = method.getPossibleClusters(entity)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
     return MentionOut(
         entity_id=entity.entity_id,

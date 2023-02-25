@@ -16,3 +16,6 @@ class EntityOut(BaseModel):
     in_cluster: bool
     cluster_id: str
     has_mention_vector: bool
+
+class DeleteEntitiesIn(BaseModel):
+    entity_ids: list[str]

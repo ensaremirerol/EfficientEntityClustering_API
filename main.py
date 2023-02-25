@@ -12,8 +12,13 @@ import logging
 from logging.handlers import RotatingFileHandler
 import sys
 from utils.SIGINT_handler import SIGINTHandler
+from dotenv import load_dotenv
+load_dotenv()
 
 LOGGER_PATH = Path(os.getenv("LOGGER_PATH") or "./")
+SETUP_TYPE = os.getenv("SETUP_TYPE") or "base"
+DATA_PATH = Path(os.getenv("DATA_PATH") or "data")
+WORD2VEC_FILE = Path(os.getenv("WORD2VEC_FILE") or "word2vec.model")
 
 if not LOGGER_PATH.exists():
     LOGGER_PATH.mkdir()
@@ -29,18 +34,19 @@ logging.basicConfig(
         RotatingFileHandler(LOGGER_PATH / "main.log", maxBytes=1000000, backupCount=5)])
 
 
-def exception_handler(request, exc):
-    logging.exception("Uncatched exception!\n{}".format(exc))
-
-
-sys.excepthook = exception_handler
-
 app = FastAPI()
 
 app.include_router(entities_router, prefix="/entities", tags=["entities"])
 app.include_router(cluster_router, prefix="/clusters", tags=["clusters"])
 app.include_router(mention_clustering_router, prefix="/mention_clustering",
                    tags=["mention_clustering"])
+
+
+def exception_handler(request, exc):
+    logging.error(exc)
+
+
+app.add_exception_handler(Exception, exception_handler)
 
 
 @app.get("/")
@@ -85,120 +91,150 @@ async def shutdown_event():
 
 
 # region Load data
-def check_files():
+def check_data_path():
     logging.info("Checking files...")
-    _env_data = os.getenv("DATA_PATH") or "data"
-    data_path = Path(_env_data)
 
-    if not data_path.exists():
-        data_path.mkdir()
+    if not DATA_PATH.exists():
+        raise FileNotFoundError("Data path not found")
 
-    return data_path
+
+def _neo4j_setup():
+    from eec import Neo4JClusterRepository, Neo4JEntityRepository, Neo4JMentionClusteringMethod, Neo4JHelper
+    from gensim.models import KeyedVectors
+
+    # Load Word2Vec model
+    model_path = WORD2VEC_FILE
+    if not model_path.exists():
+        logging.error("Model file not found")
+        exit(1)
+    model = KeyedVectors.load(str(model_path))
+    logging.info("Model loaded")
+
+    Neo4JHelper(
+        uri=os.getenv("NEO4J_URI"),
+        user=os.getenv("NEO4J_USER"),
+        password=os.getenv("NEO4J_PASSWORD")
+    )
+
+    entity_repo = Neo4JEntityRepository(
+        keyed_vectors=model
+    )
+    cluster_repo = Neo4JClusterRepository(
+        entity_repository=entity_repo
+    )
+
+    method = Neo4JMentionClusteringMethod(
+        name='neo4j',
+        entity_repository=entity_repo,
+        cluster_repository=cluster_repo,
+    )
+
+    EntityClustererBridge().set_cluster_repository(cluster_repo)
+    EntityClustererBridge().set_entity_repository(entity_repo)
+    EntityClustererBridge().set_mention_clustering_method(method)
+
+
+def _base_setup():
+    from eec import BaseEntityRepository, BaseClusterRepository, BaseMentionClusteringMethod
+    from gensim.models import KeyedVectors
+
+    # Load Word2Vec model
+    model_path = WORD2VEC_FILE
+    if not model_path.exists():
+        logging.error("Model file not found")
+        exit(1)
+    model = KeyedVectors.load(str(model_path))
+    logging.info("Model loaded")
+    # Load entities
+    entities_path = DATA_PATH / "entities.json"
+    entity_repo = None
+    if not entities_path.exists():
+        logging.info("Entities file not found")
+        logging.info("Creating empty entities object")
+        entity_repo = BaseEntityRepository(
+            entities=[],
+            last_id=0,
+            keyed_vectors=model
+        )
+    else:
+        with open(entities_path, "r") as f:
+            data = json.load(f)
+        entity_repo = BaseEntityRepository.from_dict(
+            data=data,
+            keyed_vectors=model
+        )
+
+    # Load clusters
+    clusters_path = DATA_PATH / "clusters.json"
+    cluster_repo = None
+    if not clusters_path.exists():
+        logging.info("Clusters file not found")
+        logging.info("Creating empty clusters object")
+        cluster_repo = BaseClusterRepository(
+            clusters=[],
+            entity_repository=entity_repo,
+            last_cluster_id=0
+        )
+    else:
+        with open(clusters_path, "r") as f:
+            data = json.load(f)
+        cluster_repo = BaseClusterRepository.from_dict(
+            cluster_repository_dict=data,
+            entity_repository=entity_repo
+        )
+
+    method = BaseMentionClusteringMethod(
+        name='base',
+        entity_repository=entity_repo,
+        cluster_repository=cluster_repo,
+    )
+
+    EntityClustererBridge().set_cluster_repository(cluster_repo)
+    EntityClustererBridge().set_entity_repository(entity_repo)
+    EntityClustererBridge().set_mention_clustering_method(method)
 
 
 def load_data():
     logging.info("Loading data...")
-    data_path = check_files()
+    check_data_path()
 
-    # Load config
-    config_path = data_path / "config.json"
-    if not config_path.exists():
-        logging.error("Config file not found")
-        exit(1)
-    with open(config_path, "r") as f:
-        config = json.load(f)
-    logging.info("Config loaded")
+    if SETUP_TYPE == 'neo4j':
+        _neo4j_setup()
+    elif SETUP_TYPE == 'base':
+        _base_setup()
+    else:
+        raise ValueError("Invalid type")
 
-    if config['type'] == 'base':
-        from eec import BaseEntityRepository, BaseClusterRepository
-        from gensim.models import KeyedVectors
 
-        # Load Word2Vec model
-        model_path = data_path / config['word2vec_file']
-        if not model_path.exists():
-            logging.error("Model file not found")
-            exit(1)
-        model = KeyedVectors.load(str(model_path))
-        logging.info("Model loaded")
-        # Load entities
-        entities_path = data_path / "entities.json"
-        entity_repo = None
-        if not entities_path.exists():
-            logging.info("Entities file not found")
-            logging.info("Creating empty entities object")
-            entity_repo = BaseEntityRepository(
-                entities=[],
-                last_id=0,
-                keyed_vectors=model
-            )
-        else:
-            with open(entities_path, "r") as f:
-                data = json.load(f)
-            entity_repo = BaseEntityRepository.from_dict(
-                data=data,
-                keyed_vectors=model
-            )
-
-        # Load clusters
-        clusters_path = data_path / "clusters.json"
-        cluster_repo = None
-        if not clusters_path.exists():
-            logging.info("Clusters file not found")
-            logging.info("Creating empty clusters object")
-            cluster_repo = BaseClusterRepository(
-                clusters=[],
-                entity_repository=entity_repo,
-                last_cluster_id=0
-            )
-        else:
-            with open(clusters_path, "r") as f:
-                data = json.load(f)
-            cluster_repo = BaseClusterRepository.from_dict(
-                cluster_repository_dict=data,
-                entity_repository=entity_repo
-            )
-
-        method = None
-
-        if config['method_config']['method'] == 'base':
-            from eec import BaseMentionClusteringMethod
-            method = BaseMentionClusteringMethod(
-                name='base',
-                entity_repository=entity_repo,
-                cluster_repository=cluster_repo,
-            )
-
-        EntityClustererBridge().set_cluster_repository(cluster_repo)
-        EntityClustererBridge().set_entity_repository(entity_repo)
-        EntityClustererBridge().set_mention_clustering_method(method)
 # endregion
 
 # region Save data
 
 
 def save_data():
-    with SIGINTHandler():
-        logging.info("Saving data...")
-        data_path = check_files()
+    if SETUP_TYPE == 'base':
+        with SIGINTHandler():
+            logging.info("Saving data...")
+            check_data_path()
 
-        # Save entities
-        entities_path = data_path / "entities.json.new"
-        with open(entities_path, "w") as f:
-            json.dump(EntityClustererBridge().entity_repository.to_dict(), f)
+            # Save entities
+            entities_path = DATA_PATH / "entities.json.new"
+            with open(entities_path, "w") as f:
+                json.dump(EntityClustererBridge().entity_repository.to_dict(), f)
 
-        os.remove(data_path / "entities.json")
-        os.rename(entities_path, data_path / "entities.json")
+            os.remove(DATA_PATH / "entities.json")
+            os.rename(entities_path, DATA_PATH / "entities.json")
 
-        logging.info("Entities saved")
+            logging.info("Entities saved")
 
-        # Save clusters
-        clusters_path = data_path / "clusters.json.new"
-        with open(clusters_path, "w") as f:
-            json.dump(EntityClustererBridge().cluster_repository.to_dict(), f)
+            # Save clusters
+            clusters_path = DATA_PATH / "clusters.json.new"
+            with open(clusters_path, "w") as f:
+                json.dump(EntityClustererBridge().cluster_repository.to_dict(), f)
 
-        os.remove(data_path / "clusters.json")
-        os.rename(clusters_path, data_path / "clusters.json")
-        logging.info("Clusters saved")
+            os.remove(DATA_PATH / "clusters.json")
+            os.rename(clusters_path, DATA_PATH / "clusters.json")
+            logging.info("Clusters saved")
 
 # endregion
 
