@@ -1,7 +1,6 @@
 from models import Token, AuthenticatedUser
 
 from fastapi import FastAPI, Depends, HTTPException, status, Request
-from fastapi.openapi.docs import get_swagger_ui_html
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from jose import JWTError, jwt
 from datetime import datetime, timedelta
@@ -13,7 +12,6 @@ from dotenv import load_dotenv
 from pathlib import Path
 import os
 import json
-from filelock import FileLock
 import logging
 
 load_dotenv()
@@ -75,7 +73,13 @@ o_auth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/v1/auth/login")
 
 app = FastAPI(
     title="Authentication Service", description="Authentication Service for EEC",
+    root_path="/api/v1/auth", version="1.0.0",
+    root_path_in_servers=True
 )
+if SYSTEM_TYPE == "base":
+    app.add_middleware(FileLockerMiddleware,
+                       files_to_lock=[DATA_PATH / "user_repository.json"],
+                       before=read_base_user_repository, after=write_base_user_repository)
 
 
 @app.on_event("startup")
@@ -85,9 +89,6 @@ async def startup_event():
 
     elif SYSTEM_TYPE == "base":
         read_base_user_repository()
-        app.add_middleware(FileLockerMiddleware,
-                           files_to_lock=[DATA_PATH / "user_repository.json"],
-                           before=read_base_user_repository, after=write_base_user_repository)
     user_count = user_repository.get_user_count()
 
     if user_count == 1:
@@ -170,6 +171,5 @@ async def verify(request: Request, token: str = Depends(o_auth2_scheme)):
 if __name__ == "__main__":
     print("only debug")
     logging.basicConfig(level=logging.DEBUG)
-    o_auth2_scheme = OAuth2PasswordBearer(tokenUrl="login")
     import uvicorn
     uvicorn.run(app, host="0.0.0.0", port=8001, log_level="debug")
