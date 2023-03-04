@@ -10,6 +10,8 @@ docker build -t eec_auth ./services/authentication_service
 
 docker build -t eec_entity ./services/entity_service
 
+docker build -t eec_cluster ./services/cluster_service
+
 
 # Run the microservices
 

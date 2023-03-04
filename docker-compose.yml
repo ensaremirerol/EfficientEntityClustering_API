@@ -34,7 +34,7 @@ services:
       - .env
     networks:
       - eec-network
-    
+
     labels:
       - "traefik.enable=true"
       - "traefik.http.routers.eec_auth.entrypoints=http"
@@ -58,11 +58,31 @@ services:
     labels:
       - "traefik.enable=true"
       - "traefik.http.routers.eec_entity.entrypoints=http"
-      - "traefik.http.routers.eec_entity.rule=Host(`eec.localhost`) && PathPrefix(`/api/v1/entity_repository`)"
-      - "traefik.http.middlewares.eec_entity_middleware.stripprefix.prefixes=/api/v1/entity_repository"
+      - "traefik.http.routers.eec_entity.rule=Host(`eec.localhost`) && PathPrefix(`/api/v1/entities`)"
+      - "traefik.http.middlewares.eec_entity_middleware.stripprefix.prefixes=/api/v1/entities"
       - "traefik.http.routers.eec_entity.middlewares=eec_entity_middleware"
       - "traefik.docker.network=eec-network"
     volumes:
       - ./data:/data
+
+  eec_cluster:
+    depends_on:
+      - traefik
+      - eec_auth
+    image: eec_cluster
+    env_file:
+      - .env
+    networks:
+      - eec-network
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.eec_cluster.entrypoints=http"
+      - "traefik.http.routers.eec_cluster.rule=Host(`eec.localhost`) && PathPrefix(`/api/v1/clusters`)"
+      - "traefik.http.middlewares.eec_cluster_middleware.stripprefix.prefixes=/api/v1/clusters"
+      - "traefik.http.routers.eec_cluster.middlewares=eec_cluster_middleware"
+      - "traefik.docker.network=eec-network"
+    volumes:
+      - ./data:/data
+  
 
       

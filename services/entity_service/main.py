@@ -108,7 +108,7 @@ app = FastAPI(
     title="Entity Repository",
     description="A service for managing entities.",
     version="1.0.0",
-    root_path="/api/v1/entity_repository",
+    root_path="/api/v1/entities",
     root_path_in_servers=True
 )
 
@@ -141,7 +141,7 @@ async def auth_required(security_scopes: SecurityScopes, token: dict = Depends(o
     return response.json()
 
 
-@app.get("/entity/", response_model=list[EntityOut])
+@app.get("/", response_model=list[EntityOut])
 async def get_entities(
     user: dict = Security(auth_required, scopes=[])
 ):
@@ -221,7 +221,7 @@ async def create_entity(entity_in: EntityIn, user: dict = Security(auth_required
     return _entity_to_entityOut(entity)
 
 
-@app.post("/entities/create", response_model=list[EntityOut], status_code=201)
+@app.post("/create", response_model=list[EntityOut], status_code=201)
 async def create_entities(entities_in: list[EntityIn], user: dict = Security(auth_required, scopes=["admin"])):
     entities: list[EntityModel] = [
         _entityIn_to_entity(entity)
@@ -276,7 +276,7 @@ async def delete_entity(entity_id: str, user: dict = Security(auth_required, sco
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@app.delete("/entities/delete", status_code=204)
+@app.delete("/delete", status_code=204)
 async def delete_entities(payload: DeleteEntitiesIn, user: dict = Security(auth_required, scopes=["admin"])):
     try:
         entity_repository.delete_entities(payload.entity_ids, suppress_exceptions=True)
