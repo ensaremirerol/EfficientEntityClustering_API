@@ -1,5 +1,6 @@
 from typing import List
-from fastapi import APIRouter, HTTPException, Header
+from fastapi import APIRouter, HTTPException, Header, Security, Depends
+from fastapi.security import OAuth2PasswordBearer
 from fastapi.responses import FileResponse
 from .models import *
 import pandas as pd
@@ -7,6 +8,10 @@ import pandas as pd
 from eec import EntityClustererBridge, BaseEntityRepository, BaseEntity, NotFoundException, AlreadyExistsException
 
 entities_router = APIRouter()
+
+
+o_auth2_scheme = OAuth2PasswordBearer(
+    tokenUrl="/api/v1/auth/login", scopes={"admin": "Admin access"})
 
 
 def _entityIn_to_entity(entity_in: EntityIn) -> BaseEntity:

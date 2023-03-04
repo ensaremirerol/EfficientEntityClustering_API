@@ -1,7 +1,7 @@
 from models import Token, AuthenticatedUser
 
 from fastapi import FastAPI, Depends, HTTPException, status, Request
-from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
+from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm, SecurityScopes
 from jose import JWTError, jwt
 from datetime import datetime, timedelta
 from passlib.context import CryptContext
@@ -24,6 +24,11 @@ ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 30
 user_repository: IUserRepository = None
 last_user_repository_update: float = None
+
+pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+
+o_auth2_scheme = OAuth2PasswordBearer(
+    tokenUrl="/api/v1/auth/login", scopes={"admin": "Admin access"})
 
 
 def neo4j_user_repository():
@@ -66,10 +71,6 @@ def write_base_user_repository():
     os.replace(temp_path, USER_DATA_PATH)
     last_user_repository_update = USER_DATA_PATH.stat().st_mtime
 
-
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
-
-o_auth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/v1/auth/login")
 
 app = FastAPI(
     title="Authentication Service", description="Authentication Service for EEC",

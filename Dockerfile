@@ -1,22 +1,15 @@
-FROM python:3.10.9 AS base
-
-ENV DATA_PATH="/data"
-
-COPY . /app
-
-WORKDIR /app
+FROM python:3.10.9-slim-bullseye AS base
 
 RUN apt-get update
 RUN apt-get -y install libc-dev
 RUN apt-get -y install build-essential
 RUN pip install -U pip
 
+COPY ./requirements.txt .
+
 RUN pip install -r requirements.txt
 
-RUN pip install ./packages/eec/src
+COPY ./packages /packages
 
-# Entry point for FastAPI
-
-ENTRYPOINT ["python", "main.py"]
-
-EXPOSE 8000
+RUN pip install ./packages/eec/package
+RUN pip install ./packages/file_locker_middleware/

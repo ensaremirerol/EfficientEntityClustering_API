@@ -1,0 +1,68 @@
+version: '3.7'
+
+networks:
+  eec-network:
+    driver: bridge
+
+services:
+  traefik:
+    image: traefik:latest
+    command:
+      - --api.insecure=true
+      - --providers.docker=true
+      - --providers.docker.exposedbydefault=false
+      - traefik.http.services.traefik-dashboard.loadbalancer.server.port=8080
+      - traefik.http.routers.traefik-dashboard-http.entrypoints=http
+      - traefik.http.routers.traefik-dashboard-http.rule=Host(`traefik.localhost`)
+    
+    ports:
+      - "80:80"
+      - "8080:8080"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    networks:
+      eec-network:
+        aliases:
+          - eec.localhost
+          - traefik.localhost
+
+  eec_auth:
+    depends_on:
+      - traefik
+    image: eec_auth
+    env_file:
+      - .env
+    networks:
+      - eec-network
+    
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.eec_auth.entrypoints=http"
+      - "traefik.http.routers.eec_auth.rule=Host(`eec.localhost`) && PathPrefix(`/api/v1/auth`)"
+      - "traefik.http.middlewares.eec_auth_middleware.stripprefix.prefixes=/api/v1/auth"
+      - "traefik.http.routers.eec_auth.middlewares=eec_auth_middleware"
+      - "traefik.docker.network=eec-network"
+    volumes:
+      - ./data:/data
+
+
+  eec_entity:
+    depends_on:
+      - traefik
+      - eec_auth
+    image: eec_entity
+    env_file:
+      - .env
+    networks:
+      - eec-network
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.eec_entity.entrypoints=http"
+      - "traefik.http.routers.eec_entity.rule=Host(`eec.localhost`) && PathPrefix(`/api/v1/entity_repository`)"
+      - "traefik.http.middlewares.eec_entity_middleware.stripprefix.prefixes=/api/v1/entity_repository"
+      - "traefik.http.routers.eec_entity.middlewares=eec_entity_middleware"
+      - "traefik.docker.network=eec-network"
+    volumes:
+      - ./data:/data
+
+      
