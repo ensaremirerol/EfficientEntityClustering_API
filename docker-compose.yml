@@ -83,6 +83,25 @@ services:
       - "traefik.docker.network=eec-network"
     volumes:
       - ./data:/data
+
+  eec_mention:
+    depends_on:
+      - traefik
+      - eec_auth
+    image: eec_mention
+    env_file:
+      - .env
+    networks:
+      - eec-network
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.eec_mention.entrypoints=http"
+      - "traefik.http.routers.eec_mention.rule=Host(`eec.localhost`) && PathPrefix(`/api/v1/mention`)"
+      - "traefik.http.middlewares.eec_mention_middleware.stripprefix.prefixes=/api/v1/mention"
+      - "traefik.http.routers.eec_mention.middlewares=eec_mention_middleware"
+      - "traefik.docker.network=eec-network"
+    volumes:
+      - ./data:/data
   
 
       

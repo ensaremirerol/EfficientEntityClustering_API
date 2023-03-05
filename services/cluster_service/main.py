@@ -111,7 +111,7 @@ def read_base_cluster_repository():
         with open(CLUSTER_DATA_PATH, "r") as f:
             cluster_repository = BaseClusterRepository.decode(
                 entity_repository=entity_repository,
-                json_data=json.load(f)
+                cluster_repository_dict=json.load(f)
             )
         last_cluster_repository_update = CLUSTER_DATA_PATH.stat().st_mtime
 
