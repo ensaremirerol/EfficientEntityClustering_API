@@ -163,9 +163,9 @@ if SYSTEM_TYPE == "base":
 
 @app.on_event("startup")
 async def startup_event():
+    global entity_repository, cluster_repository, mention_clustering_method
     if SYSTEM_TYPE == "neo4j":
         neo4j_repositories()
-        global entity_repository, cluster_repository, mention_clustering_method
         mention_clustering_method = Neo4JMentionClusteringMethod(
             entity_repository=entity_repository,
             cluster_repository=cluster_repository,
@@ -175,7 +175,6 @@ async def startup_event():
 
     elif SYSTEM_TYPE == "base":
         read_base_repositories()
-        global entity_repository, cluster_repository, mention_clustering_method
         mention_clustering_method = BaseMentionClusteringMethod(
             entity_repository=entity_repository,
             cluster_repository=cluster_repository,
