@@ -234,7 +234,7 @@ async def create_cluster(cluster_in: ClusterIn, user: dict = Security(auth_requi
     return _base_cluster_to_clusterOut(cluster)
 
 
-@app.delete("/cluster/{cluster_id}", status_code=204)
+@app.delete("/cluster/{cluster_id}/delete", status_code=204)
 async def delete_cluster(cluster_id: str, user: dict = Security(auth_required, scopes=["editor"])):
     try:
         cluster_repository.delete_cluster(cluster_id)

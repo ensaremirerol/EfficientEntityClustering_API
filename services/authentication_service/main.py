@@ -108,6 +108,14 @@ async def startup_event():
             write_base_user_repository()
 
 
+# To test the connecton between the service and the database
+@app.get("/")
+def handshake():
+    return {
+        "application": "EEC Authentication Service",
+    }
+
+
 @app.post("/login", response_model=Token, tags=["auth"])
 async def login(form_data: OAuth2PasswordRequestForm = Depends()):
     try:
