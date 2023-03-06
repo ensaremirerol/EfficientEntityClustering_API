@@ -131,7 +131,7 @@ async def get_current_user(auth_user: dict = Security(auth_required)):
     return UserOut(
         user_id=auth_user["user_id"],
         username=auth_user["username"],
-        role=auth_user["role"]
+        scopes=auth_user["scopes"]
     )
 
 
