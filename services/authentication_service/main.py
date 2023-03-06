@@ -28,7 +28,8 @@ last_user_repository_update: float = None
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
 o_auth2_scheme = OAuth2PasswordBearer(
-    tokenUrl="/api/v1/auth/login", scopes={"admin": "Admin access"})
+    tokenUrl="/api/v1/auth/login",
+    scopes={"admin": "Admin access", "editor": "Editor access", "export": "Export access"})
 
 
 def neo4j_user_repository():
@@ -79,8 +80,8 @@ app = FastAPI(
 )
 if SYSTEM_TYPE == "base":
     app.add_middleware(FileLockerMiddleware,
-                       files_to_lock=[DATA_PATH / "user_repository.json"],
-                       before=read_base_user_repository, after=write_base_user_repository)
+                       files_to_lock=[],
+                       before=read_base_user_repository)
 
 
 @app.on_event("startup")
@@ -94,13 +95,17 @@ async def startup_event():
 
     if user_count == 1:
         user = user_repository.get_all_users()[0]
-        user_repository.change_role(user.user_id, "admin")
-        write_base_user_repository()
+        user_repository.change_scopes(user.user_id, [
+            'admin'
+        ])
+        if SYSTEM_TYPE == "base":
+            write_base_user_repository()
 
     elif user_count == 0:
         user_repository.add_user(
-            username="admin", hashed_password=pwd_context.hash("admin"), role="admin")
-        write_base_user_repository()
+            username="admin", hashed_password=pwd_context.hash("admin"), scopes="admin")
+        if SYSTEM_TYPE == "base":
+            write_base_user_repository()
 
 
 @app.post("/login", response_model=Token, tags=["auth"])
@@ -130,7 +135,7 @@ async def login(form_data: OAuth2PasswordRequestForm = Depends()):
 
     token_data = {
         "sub": user.username,
-        "role": user.role,
+        "scopes": user.scopes,
         "exp": datetime.utcnow() + timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES),
     }
 
@@ -144,7 +149,7 @@ async def verify(request: Request, token: str = Depends(o_auth2_scheme)):
     try:
         payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
         username: str = payload.get("sub")
-        role: str = payload.get("role")
+        scopes: list[str] = payload.get("scopes")
         exp: float = payload.get("exp")
         if exp is None or exp < datetime.utcnow().timestamp():
             raise HTTPException(
@@ -166,7 +171,9 @@ async def verify(request: Request, token: str = Depends(o_auth2_scheme)):
             headers={"WWW-Authenticate": "Bearer"},
         )
 
-    return AuthenticatedUser(username=username, role=role)
+    user_id = user_repository.get_user_by_name(username).user_id
+
+    return AuthenticatedUser(user_id=user_id, username=username, scopes=scopes)
 
 
 if __name__ == "__main__":

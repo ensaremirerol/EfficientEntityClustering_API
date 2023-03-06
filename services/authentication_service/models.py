@@ -7,5 +7,6 @@ class Token(BaseModel):
 
 
 class AuthenticatedUser(BaseModel):
+    user_id: str
     username: str
-    role: str
+    scopes: list[str]

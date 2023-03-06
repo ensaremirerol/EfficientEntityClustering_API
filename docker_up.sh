@@ -14,7 +14,9 @@ docker build -t eec_cluster ./services/cluster_service
 
 docker build -t eec_mention ./services/mention_clustering_service
 
+docker build -t eec_user ./services/user_service
+
 
 # Run the microservices
 
-docker-compose up --build -d
+docker-compose up --build --force-recreate -d

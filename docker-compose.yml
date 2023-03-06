@@ -4,6 +4,50 @@ networks:
   eec-network:
     driver: bridge
 
+x-env: &env
+  - SYSTEM_TYPE=neo4j
+  - DATA_PATH=/data
+  - LOGGER_PATH=/data
+  - SECRET_KEY=081fd0acd887553199450178003fa22dfaeaeafb6053d462c3179366c5d8a113
+  - WORD2VEC_FILE=/data/word2vec.model
+  # Only needed if you want to use the neo4j database
+  - NEO4J_URI=bolt://neo4j:7687
+  - NEO4J_USER=neo4j
+  - NEO4J_PASSWORD=test
+
+volumes:
+  eec_data:
+    driver_opts:
+      type: none
+      device: /Users/ensaremirerol/workspace/thesis/new/eec_neo4j/api_data
+      o: bind
+  neo4j_conf:
+    driver_opts:
+      type: none
+      device: /Users/ensaremirerol/workspace/thesis/new/eec_neo4j/neo4j_data/conf
+      o: bind
+  neo4j_data:
+    driver_opts:
+      type: none
+      device: /Users/ensaremirerol/workspace/thesis/new/eec_neo4j/neo4j_data/data
+      o: bind
+  neo4j_import:
+    driver_opts:
+      type: none
+      device: /Users/ensaremirerol/workspace/thesis/new/eec_neo4j/neo4j_data/import
+      o: bind
+  neo4j_logs:
+    driver_opts:
+      type: none
+      device: /Users/ensaremirerol/workspace/thesis/new/eec_neo4j/neo4j_data/logs
+      o: bind
+  neo4j_plugins:
+    driver_opts:
+      type: none
+      device: /Users/ensaremirerol/workspace/thesis/new/eec_neo4j/neo4j_data/plugins
+      o: bind
+    
+
 services:
   traefik:
     image: traefik:latest
@@ -25,15 +69,53 @@ services:
         aliases:
           - eec.localhost
           - traefik.localhost
+ 
+  neo4j:
+    image: arm64v8/neo4j:4.4.11
+    networks:
+      - eec-network
+    restart: on-failure
+
+    depends_on:
+      - traefik
+
+    healthcheck:
+      test: wget http://localhost:7474 || exit 1
+      interval: 1s
+      timeout: 10s
+      retries: 20
+      start_period: 3s
+
+    ports:
+      - 7474:7474
+      - 7687:7687
+    volumes:
+      - neo4j_conf:/conf
+      - neo4j_data:/data
+      - neo4j_import:/import
+      - neo4j_logs:/logs
+      - neo4j_plugins:/plugins
+    environment:
+      - NEO4J_dbms_memory_pagecache_size=1G
+      - NEO4J_dbms.memory.heap.initial_size=1G
+      - NEO4J_dbms_memory_heap_max__size=1G
+      - NEO4JLABS_PLUGINS=["apoc", "graph-data-science"]
+      - NEO4J_dbms_security_procedures_unrestricted=apoc.\*
+      - NEO4J_AUTH=neo4j/${NEO4J_PASSWORD-test}
 
   eec_auth:
     depends_on:
-      - traefik
+      traefik:
+          condition: service_started
+      neo4j:
+          condition: service_healthy
     image: eec_auth
-    env_file:
-      - .env
+    environment: *env
     networks:
       - eec-network
+
+    links:
+      - neo4j:neo4j
 
     labels:
       - "traefik.enable=true"
@@ -43,18 +125,18 @@ services:
       - "traefik.http.routers.eec_auth.middlewares=eec_auth_middleware"
       - "traefik.docker.network=eec-network"
     volumes:
-      - ./data:/data
-
+      - eec_data:/data
 
   eec_entity:
     depends_on:
       - traefik
       - eec_auth
     image: eec_entity
-    env_file:
-      - .env
+    environment: *env
     networks:
       - eec-network
+    links:
+      - neo4j:neo4j
     labels:
       - "traefik.enable=true"
       - "traefik.http.routers.eec_entity.entrypoints=http"
@@ -63,17 +145,18 @@ services:
       - "traefik.http.routers.eec_entity.middlewares=eec_entity_middleware"
       - "traefik.docker.network=eec-network"
     volumes:
-      - ./data:/data
+      - eec_data:/data
 
   eec_cluster:
     depends_on:
       - traefik
       - eec_auth
     image: eec_cluster
-    env_file:
-      - .env
+    environment: *env
     networks:
       - eec-network
+    links:
+      - neo4j:neo4j
     labels:
       - "traefik.enable=true"
       - "traefik.http.routers.eec_cluster.entrypoints=http"
@@ -82,17 +165,18 @@ services:
       - "traefik.http.routers.eec_cluster.middlewares=eec_cluster_middleware"
       - "traefik.docker.network=eec-network"
     volumes:
-      - ./data:/data
+      - eec_data:/data
 
   eec_mention:
     depends_on:
       - traefik
       - eec_auth
     image: eec_mention
-    env_file:
-      - .env
+    environment: *env
     networks:
       - eec-network
+    links:
+      - neo4j:neo4j
     labels:
       - "traefik.enable=true"
       - "traefik.http.routers.eec_mention.entrypoints=http"
@@ -101,7 +185,24 @@ services:
       - "traefik.http.routers.eec_mention.middlewares=eec_mention_middleware"
       - "traefik.docker.network=eec-network"
     volumes:
-      - ./data:/data
-  
+      - eec_data:/data
 
-      
+  eec_user:
+    depends_on:
+      - traefik
+      - eec_auth
+    image: eec_user
+    environment: *env
+    networks:
+      - eec-network
+    links:
+      - neo4j:neo4j
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.eec_user.entrypoints=http"
+      - "traefik.http.routers.eec_user.rule=Host(`eec.localhost`) && PathPrefix(`/api/v1/users`)"
+      - "traefik.http.middlewares.eec_user_middleware.stripprefix.prefixes=/api/v1/users"
+      - "traefik.http.routers.eec_user.middlewares=eec_user_middleware"
+      - "traefik.docker.network=eec-network"
+    volumes:
+      - eec_data:/data

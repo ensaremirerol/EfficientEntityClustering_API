@@ -27,7 +27,8 @@ AUTH_SERVICE_URL = os.getenv("AUTH_SERVICE_URL") or "http://eec.localhost/api/v1
 entity_repository: IEntityRepository = None
 last_entity_repository_update: float = None
 o_auth2_scheme = OAuth2PasswordBearer(
-    tokenUrl="/api/v1/auth/login", scopes={"admin": "Admin access"})
+    tokenUrl="/api/v1/auth/login",
+    scopes={"admin": "Admin access", "editor": "Editor access", "export": "Export access"})
 
 
 def get_word2vec_model():
@@ -135,8 +136,16 @@ async def auth_required(security_scopes: SecurityScopes, token: dict = Depends(o
     if response.status_code != 200:
         raise HTTPException(status_code=401, detail="Unauthorized")
 
-    if len(security_scopes.scopes) > 0 and security_scopes.scopes[0] not in response.json()["role"]:
-        raise HTTPException(status_code=401, detail="Unauthorized")
+    if 'admin' in response.json()["scopes"]:
+        return response.json()
+
+    if 'admin' in security_scopes.scopes:
+        if 'admin' not in response.json()["scopes"]:
+            raise HTTPException(status_code=401, detail="Unauthorized")
+
+    for scope in security_scopes.scopes:
+        if scope != "admin" and scope not in response.json()["scopes"]:
+            raise HTTPException(status_code=401, detail="Unauthorized")
 
     return response.json()
 
@@ -210,7 +219,7 @@ async def get_next_entity(num: int = 1, user: dict = Security(auth_required, sco
 
 
 @app.post("/entity/create", response_model=EntityOut, status_code=201)
-async def create_entity(entity_in: EntityIn, user: dict = Security(auth_required, scopes=["admin"])):
+async def create_entity(entity_in: EntityIn, user: dict = Security(auth_required, scopes=["editor"])):
     entity: EntityModel = _entityIn_to_entity(entity_in)
     try:
         entity = entity_repository.add_entity(entity)
@@ -222,7 +231,7 @@ async def create_entity(entity_in: EntityIn, user: dict = Security(auth_required
 
 
 @app.post("/create", response_model=list[EntityOut], status_code=201)
-async def create_entities(entities_in: list[EntityIn], user: dict = Security(auth_required, scopes=["admin"])):
+async def create_entities(entities_in: list[EntityIn], user: dict = Security(auth_required, scopes=["editor"])):
     entities: list[EntityModel] = [
         _entityIn_to_entity(entity)
         for entity in entities_in
@@ -238,7 +247,7 @@ async def create_entities(entities_in: list[EntityIn], user: dict = Security(aut
 
 
 @app.post("/entity/{entity_id}/update", response_model=EntityOut, status_code=200)
-async def update_entity(entity_id: str, entity_in: EntityIn, user: dict = Security(auth_required, scopes=["admin"])):
+async def update_entity(entity_id: str, entity_in: EntityIn, user: dict = Security(auth_required, scopes=["editor"])):
     entity: EntityModel = _entityIn_to_entity(entity_in)
     try:
         org_entity = entity_repository.get_entity_by_id(entity_id)
@@ -259,7 +268,7 @@ async def update_entity(entity_id: str, entity_in: EntityIn, user: dict = Securi
 
 
 @app.delete("/entity/{entity_id}/delete", status_code=204)
-async def delete_entity(entity_id: str, user: dict = Security(auth_required, scopes=["admin"])):
+async def delete_entity(entity_id: str, user: dict = Security(auth_required, scopes=["editor"])):
     try:
         entity = entity_repository.get_entity_by_id(entity_id)
     except NotFoundException as e:
@@ -277,7 +286,7 @@ async def delete_entity(entity_id: str, user: dict = Security(auth_required, sco
 
 
 @app.delete("/delete", status_code=204)
-async def delete_entities(payload: DeleteEntitiesIn, user: dict = Security(auth_required, scopes=["admin"])):
+async def delete_entities(payload: DeleteEntitiesIn, user: dict = Security(auth_required, scopes=["editor"])):
     try:
         entity_repository.delete_entities(payload.entity_ids, suppress_exceptions=True)
     except Exception as e:
@@ -285,7 +294,7 @@ async def delete_entities(payload: DeleteEntitiesIn, user: dict = Security(auth_
 
 
 @app.get("/export/csv", response_class=FileResponse)
-async def export_entities_csv(user: dict = Security(auth_required, scopes=["admin"])):
+async def export_entities_csv(user: dict = Security(auth_required, scopes=["editor"])):
     _all_entites: list[EntityModel] = entity_repository.get_all_entities()
     pd.DataFrame([
         {
@@ -300,11 +309,11 @@ async def export_entities_csv(user: dict = Security(auth_required, scopes=["admi
         }
         for entity in _all_entites
     ]).to_csv(
-        './tmp/entities.csv',
+        DATA_PATH / 'entities.csv',
     )
 
     return FileResponse(
-        path="./tmp/entities.csv",
+        path=DATA_PATH / 'entities.csv',
         filename="entities.csv",
         media_type="text/csv"
     )

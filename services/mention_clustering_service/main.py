@@ -38,7 +38,8 @@ mention_clustering_method: IMentionClusteringMethod = None
 last_entity_repository_update: float = None
 last_cluster_repository_update: float = None
 o_auth2_scheme = OAuth2PasswordBearer(
-    tokenUrl="/api/v1/auth/login", scopes={"admin": "Admin access"})
+    tokenUrl="/api/v1/auth/login",
+    scopes={"admin": "Admin access", "editor": "Editor access", "export": "Export access"})
 
 
 def get_word2vec_model():
@@ -184,14 +185,22 @@ async def auth_required(security_scopes: SecurityScopes, token: dict = Depends(o
     if response.status_code != 200:
         raise HTTPException(status_code=401, detail="Unauthorized")
 
-    if len(security_scopes.scopes) > 0 and security_scopes.scopes[0] not in response.json()["role"]:
-        raise HTTPException(status_code=401, detail="Unauthorized")
+    if 'admin' in response.json()["scopes"]:
+        return response.json()
+
+    if 'admin' in security_scopes.scopes:
+        if 'admin' not in response.json()["scopes"]:
+            raise HTTPException(status_code=401, detail="Unauthorized")
+
+    for scope in security_scopes.scopes:
+        if scope != "admin" and scope not in response.json()["scopes"]:
+            raise HTTPException(status_code=401, detail="Unauthorized")
 
     return response.json()
 
 
 @app.get("/", response_model=MentionOut)
-async def get_prediction_for_next_mention(user: dict = Security(auth_required, scopes=[""])):
+async def get_prediction_for_next_mention(user: dict = Security(auth_required, scopes=[])):
 
     try:
         entity: EntityModel = entity_repository.get_random_unlabeled_entity()

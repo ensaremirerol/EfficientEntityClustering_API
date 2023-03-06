@@ -36,7 +36,8 @@ cluster_repository: IClusterRepository = None
 last_entity_repository_update: float = None
 last_cluster_repository_update: float = None
 o_auth2_scheme = OAuth2PasswordBearer(
-    tokenUrl="/api/v1/auth/login", scopes={"admin": "Admin access"})
+    tokenUrl="/api/v1/auth/login",
+    scopes={"admin": "Admin access", "editor": "Editor access", "export": "Export access"})
 
 
 def get_word2vec_model():
@@ -169,8 +170,16 @@ async def auth_required(security_scopes: SecurityScopes, token: dict = Depends(o
     if response.status_code != 200:
         raise HTTPException(status_code=401, detail="Unauthorized")
 
-    if len(security_scopes.scopes) > 0 and security_scopes.scopes[0] not in response.json()["role"]:
-        raise HTTPException(status_code=401, detail="Unauthorized")
+    if 'admin' in response.json()["scopes"]:
+        return response.json()
+
+    if 'admin' in security_scopes.scopes:
+        if 'admin' not in response.json()["scopes"]:
+            raise HTTPException(status_code=401, detail="Unauthorized")
+
+    for scope in security_scopes.scopes:
+        if scope != "admin" and scope not in response.json()["scopes"]:
+            raise HTTPException(status_code=401, detail="Unauthorized")
 
     return response.json()
 
@@ -205,7 +214,9 @@ async def get_cluster_by_id(cluster_id: str, user: dict = Security(auth_required
 
 
 @app.post("/cluster/create", response_model=ClusterOut)
-async def create_cluster(cluster_in: ClusterIn, user: dict = Security(auth_required, scopes=[])):
+async def create_cluster(cluster_in: ClusterIn, user: dict = Security(auth_required, scopes=[
+    'editor'
+])):
     cluster = ClusterModel(
         cluster_id=cluster_in.cluster_id,
         cluster_name=cluster_in.cluster_name,
@@ -224,7 +235,7 @@ async def create_cluster(cluster_in: ClusterIn, user: dict = Security(auth_requi
 
 
 @app.delete("/cluster/{cluster_id}", status_code=204)
-async def delete_cluster(cluster_id: str, user: dict = Security(auth_required, scopes=["admin"])):
+async def delete_cluster(cluster_id: str, user: dict = Security(auth_required, scopes=["editor"])):
     try:
         cluster_repository.delete_cluster(cluster_id)
     except NotFoundException as e:
@@ -235,7 +246,7 @@ async def delete_cluster(cluster_id: str, user: dict = Security(auth_required, s
 
 
 @app.delete("/delete", status_code=204)
-async def delete_clusters(clusters_in: DeleteClustersIn, user: dict = Security(auth_required, scopes=["admin"])):
+async def delete_clusters(clusters_in: DeleteClustersIn, user: dict = Security(auth_required, scopes=["editor"])):
     try:
         cluster_repository.delete_clusters(clusters_in.cluster_ids)
     except Exception as e:
@@ -244,7 +255,7 @@ async def delete_clusters(clusters_in: DeleteClustersIn, user: dict = Security(a
 
 
 @app.delete("/delete/all", status_code=204)
-async def delete_all_clusters(user: dict = Security(auth_required, scopes=["admin"])):
+async def delete_all_clusters(user: dict = Security(auth_required, scopes=["editor"])):
     try:
         cluster_repository.delete_all_clusters()
     except Exception as e:
@@ -294,7 +305,7 @@ async def remove_entity_from_cluster(cluster_id: str, entity_id: str, user: dict
 
 
 @app.get("/export/csv", response_class=FileResponse)
-async def export_clusters_csv(user: dict = Security(auth_required, scopes=["admin"])):
+async def export_clusters_csv(user: dict = Security(auth_required, scopes=["editor"])):
     _all_clusters: list[ClusterModel] = cluster_repository.get_all_clusters()
     pd.DataFrame([
         {
@@ -305,9 +316,9 @@ async def export_clusters_csv(user: dict = Security(auth_required, scopes=["admi
         }
         for cluster in _all_clusters
     ]).to_csv(
-        './tmp/clusters.csv',
+        DATA_PATH / 'clusters.csv',
         index=False
     )
-    return FileResponse('./tmp/clusters.csv',
+    return FileResponse(DATA_PATH / 'clusters.csv',
                         filename='clusters.csv',
                         media_type='text/csv')
