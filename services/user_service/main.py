@@ -107,7 +107,7 @@ if SYSTEM_TYPE == "base":
                        before=read_base_user_repository, after=write_base_user_repository)
 
 
-@ app.on_event("startup")
+@app.on_event("startup")
 async def startup_event():
     if SYSTEM_TYPE == "neo4j":
         neo4j_user_repository()
@@ -116,7 +116,7 @@ async def startup_event():
         read_base_user_repository()
 
 
-@ app.get("/", response_model=list[UserOut])
+@app.get("/", response_model=list[UserOut])
 async def get_all_users(user: dict = Security(auth_required, scopes=[])):
     _all_users = user_repository.get_all_users()
     return [UserOut(
@@ -126,7 +126,7 @@ async def get_all_users(user: dict = Security(auth_required, scopes=[])):
     ) for user in _all_users]
 
 
-@ app.get("/me", response_model=UserOut)
+@app.get("/me", response_model=UserOut)
 async def get_current_user(auth_user: dict = Security(auth_required)):
     return UserOut(
         user_id=auth_user["user_id"],
@@ -135,7 +135,7 @@ async def get_current_user(auth_user: dict = Security(auth_required)):
     )
 
 
-@ app.get("/user/{id}", response_model=UserOut)
+@app.get("/user/{id}", response_model=UserOut)
 async def get_user(id: str, auth_user: dict = Security(auth_required, scopes=[])):
     try:
         user = user_repository.get_user_by_id(id)
@@ -148,7 +148,7 @@ async def get_user(id: str, auth_user: dict = Security(auth_required, scopes=[])
         raise HTTPException(status_code=404, detail="User not found")
 
 
-@ app.get("/user/username/{username}", response_model=UserOut)
+@app.get("/user/username/{username}", response_model=UserOut)
 async def get_user_by_username(username: str, auth_user: dict = Security(auth_required, scopes=[])):
     try:
         user = user_repository.get_user_by_name(username)
@@ -161,7 +161,7 @@ async def get_user_by_username(username: str, auth_user: dict = Security(auth_re
         raise HTTPException(status_code=404, detail="User not found")
 
 
-@ app.post("/user/create", response_model=UserOut)
+@app.post("/user/create", response_model=UserOut)
 async def create_user(user: UserCreateIn, auth_user: dict = Security(auth_required, scopes=['admin'])):
     try:
         hashed_password = pwd_context.hash(user.password)
@@ -179,9 +179,9 @@ async def create_user(user: UserCreateIn, auth_user: dict = Security(auth_requir
         raise HTTPException(status_code=409, detail="User already exists")
 
 
-@ app.put("/user/{id}/update/username", response_model=UserOut)
+@app.put("/user/{id}/update/username", response_model=UserOut)
 async def update_user_username(id: str, user: UsernameUpdateIn, auth_user: dict = Security(auth_required, scopes=[])):
-    if auth_user["role"] != "admin" and auth_user["user_id"] != id:
+    if 'admin' not in auth_user["scopes"] and id != auth_user["user_id"]:
         raise HTTPException(status_code=401, detail="Unauthorized")
 
     try:
@@ -207,9 +207,9 @@ async def update_user_username(id: str, user: UsernameUpdateIn, auth_user: dict 
         raise HTTPException(status_code=409, detail="Username already exists")
 
 
-@ app.put("/user/{id}/update/password", response_model=UserOut)
+@app.put("/user/{id}/update/password", response_model=UserOut)
 async def update_user_password(id: str, user: PasswordUpdateIn, auth_user: dict = Security(auth_required, scopes=[])):
-    if auth_user["role"] != "admin" and auth_user["user_id"] != id:
+    if 'admin' not in auth_user["scopes"] and id != auth_user["user_id"]:
         raise HTTPException(status_code=401, detail="Unauthorized")
 
     try:
@@ -230,11 +230,11 @@ async def update_user_password(id: str, user: PasswordUpdateIn, auth_user: dict 
             username=data.username,
             scopes=data.scopes
         )
-    except AlreadyExistsException:
-        raise HTTPException(status_code=409, detail="Username already exists")
+    except Exception:
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 
-@ app.put("/user/{id}/update/scopes", response_model=UserOut)
+@app.put("/user/{id}/update/scopes", response_model=UserOut)
 async def update_user_role(id: str, user: ScopeUpdateIn, auth_user: dict = Security(auth_required, scopes=['admin'])):
     try:
         data = user_repository.change_scopes(
@@ -250,7 +250,7 @@ async def update_user_role(id: str, user: ScopeUpdateIn, auth_user: dict = Secur
         raise HTTPException(status_code=404, detail="User not found")
 
 
-@ app.delete("/user/{id}/delete", status_code=204)
+@app.delete("/user/{id}/delete", status_code=204)
 async def delete_user(id: str, auth_user: dict = Security(auth_required, scopes=['admin'])):
     try:
         user_repository.delete_user(id)

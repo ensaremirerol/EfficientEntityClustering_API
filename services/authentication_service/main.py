@@ -103,7 +103,7 @@ async def startup_event():
 
     elif user_count == 0:
         user_repository.add_user(
-            username="admin", hashed_password=pwd_context.hash("admin"), scopes="admin")
+            username="admin", hashed_password=pwd_context.hash("admin"), scopes=["admin"])
         if SYSTEM_TYPE == "base":
             write_base_user_repository()
 
